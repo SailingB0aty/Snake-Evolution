@@ -1,0 +1,9 @@
+# Enviroments
+.venv/
+
+# IDEs
+.idea/
+__pycache__/
+
+# Data and models
+data/
