@@ -20,13 +20,15 @@ DISPLAY = False
 # SLOW to slow down the visualization of training
 SLOW = False
 PREV_KEY = None
+# True to save best ever model, not the final model
+SAVE_BEST = True
 FPS = 5
-generations = 250
+generations = 1500
 
-eat_self_penalty = -100
-starve_penalty = -50
-leave_grid_penalty = -30
-eat_apple_bonus = 5
+eat_self_penalty = 0
+starve_penalty = 0
+leave_grid_penalty = 0
+eat_apple_bonus = 2
 
 SNEK_HEAD = pygame.transform.scale(pygame.image.load("data/snek_head.png"), (math.floor(box_size-(box_size/10)), math.floor(box_size-(box_size/10))))
 SNEK_TOUNG = pygame.transform.scale(pygame.image.load("data/snek_toung.png"), (math.floor(box_size-(box_size/10)), math.floor(box_size-(box_size/10))))
@@ -34,13 +36,18 @@ SNEK_TOUNG = pygame.transform.scale(pygame.image.load("data/snek_toung.png"), (m
 
 new_snake = []
 
+generation = 1
 
-def get_rand_pos(snake):
+
+def get_rand_pos(snake, seed, seed_step):
     valid_pos = False
     while not valid_pos:
+        random.seed(seed + 6358*seed_step)
         pos = [random.randint(1, GRID_SHAPE[0] - 2), random.randint(1, GRID_SHAPE[1] - 2)]
         if not pos in snake:
             valid_pos = True
+        else:
+            seed += 63427654
     return pos
 
 
@@ -103,14 +110,15 @@ def human_input():
     PREV_KEY = pressed
 
 
-def update(snake, apple, direction):
+def update(snake, apple, direction, seed, seed_step):
     global new_snake
     eaten = False
     score = 0
     game_over = False
 
+
     if snake[0] == apple:
-        apple = get_rand_pos(snake)
+        apple = get_rand_pos(snake, seed, seed_step)
         score += eat_apple_bonus
         eaten = True
 
@@ -175,13 +183,13 @@ def surrounding(snake):
     south = 0
     east = 0
     west = 0
-    if [snake[0][0], snake[0][1]-1] in snake:
+    if [snake[0][0], snake[0][1]-1] in snake or snake[0][1]-1 < 0:
         north = 1
-    if [snake[0][0], snake[0][1]+1] in snake:
+    if [snake[0][0], snake[0][1]+1] in snake or snake[0][1]+1 > 15:
         south = 1
-    if [snake[0][0]+1, snake[0][1]] in snake:
+    if [snake[0][0]+1, snake[0][1]] in snake or snake[0][0]+1 > 15:
         east = 1
-    if [snake[0][0]-1, snake[0][1]] in snake:
+    if [snake[0][0]-1, snake[0][1]] in snake or snake[0][0]-1 < 0:
         west = 1
     return north, south, east, west
 
@@ -189,12 +197,12 @@ def get_data(snake, apple, current_dir):
 
     d_food_x, d_food_y = distance_food(snake, apple)
     n_wall, s_wall, e_wall, w_wall = distance_wall(snake)
-    tail_x, tail_y = distance_tail(snake)
+    #tail_x, tail_y = distance_tail(snake)
     north, south, east, west = surrounding(snake)
 
     data = np.array([d_food_x, d_food_y,
-                    n_wall, s_wall, e_wall, w_wall,
-                    tail_x, tail_y,
+                    #n_wall, s_wall, e_wall, w_wall,
+                    #tail_x, tail_y,
                     north, south, east, west,
                     current_dir])
     '''
@@ -235,6 +243,7 @@ def main(genomes, config):
     current_dir = []
     hunger = []
     apples = []
+    seed_step = 0
 
     total_fit = 0
     high_score = 0
@@ -247,12 +256,13 @@ def main(genomes, config):
         nets.append(net)
         snakes.append([[8, 8], [8, 7]])
         current_dir.append(0)
-        hunger.append(80)
+        hunger.append(200)
         g.fitness = 0
         ge.append(g)
 
+    seed = random.randint(0, 1098652)
     for i in range(len(snakes)):
-        apples.append(get_rand_pos(snakes[i]))
+        apples.append(get_rand_pos(snakes[i], seed, seed_step))
 
     while run and len(snakes) > 0:
         if SLOW:
@@ -265,7 +275,10 @@ def main(genomes, config):
                 quit()
                 break
 
-        for i, snake in enumerate(snakes):
+        i = 0
+        while i < len(snakes):
+            snake = snakes[i]
+
             output = np.array(nets[i].activate(get_data(snake, apples[i], current_dir[i])))
             fisrt = int(np.argmax(output))
             second = int(np.argsort(output)[-2])
@@ -273,35 +286,39 @@ def main(genomes, config):
             direction = get_input(fisrt, second, current_dir[i])
             current_dir[i] = direction
 
-            snake, apples[i], game_over, score = update(snake, apples[i], direction)
-            if score < 5:
+            snake, apples[i], game_over, score = update(snake, apples[i], direction, seed, seed_step)
+            if score < eat_apple_bonus:
                 hunger[i] -= 1
             else:
-                hunger[i] = 80
+                hunger[i] = 200
 
             if len(snake) > high_score:
                 high_score = len(snake)
 
-            score += math.floor(5/(1+disance_foot_tot(snake, apples[i])))
-            score += 0.1
+            #score += math.floor(5/(1+disance_foot_tot(snake, apples[i])))
+            score += 0.01
             ge[i].fitness += score
             total_fit += score
 
             if hunger[i] <= 0:
-                ge[i].fitness -= 50
+                ge[i].fitness += starve_penalty
 
             if game_over or hunger[i] <= 0:
                 fitnesses.append(ge[i].fitness)
+
                 snakes.pop(i)
                 nets.pop(i)
                 apples.pop(i)
                 ge.pop(i)
                 current_dir.pop(i)
                 hunger.pop(i)
+                continue
+            i += 1
 
         if DISPLAY:
             draw(snakes, apples)
         human_input()
+        seed_step += 1
 
 
     highest = 0
@@ -329,10 +346,13 @@ def run(config_path):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
 
-    winner = p.run(main, generations)
+    final = p.run(main, generations)
+    best_ever = max(stats.most_fit_genomes, key=lambda g: g.fitness)
 
-    with open("data/winnerPIX.pickle", "wb") as f:
-        pickle.dump(winner, f)
+    with open("data/final.pickle", "wb") as f:
+        pickle.dump(final, f)
+    with open("data/best.pickle", "wb") as f:
+        pickle.dump(best_ever, f)
 
 
 if __name__ == "__main__":
