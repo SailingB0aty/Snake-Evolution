@@ -15,7 +15,7 @@ for item in hi_score:
 
 X = np.linspace(0, len(hi_score), len(hi_score))
 
-hi = plt.plot(X, hi_score*10, label="Length")
+hi = plt.plot(X, hi_score, label="Length")
 m_fit = plt.plot(X, max_fit, label="Max Fitness")
 a_fit = plt.plot(X, avg_fit, label="Avg Fitness")
 plt.legend()
