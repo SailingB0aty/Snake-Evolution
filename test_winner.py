@@ -8,8 +8,10 @@ import random
 
 pygame.init()
 
-pickle_in = open("data/winner.pickle", "rb")
+pickle_in = open("data/best.pickle", "rb")
 model = pickle.load(pickle_in)
+
+input_size = 7
 
 local_dir = os.path.dirname(__file__)
 config_path = os.path.join(local_dir, "config-feedforward.txt")
@@ -26,7 +28,7 @@ pygame.display.set_caption("Very Hungry Snek")
 window = pygame.display.set_mode(window_size)
 run = True
 PREV_KEY = None
-FPS = 5
+FPS = 20
 
 SNEK_HEAD = pygame.transform.scale(pygame.image.load("data/snek_head.png"), (math.floor(box_size-(box_size/10)), math.floor(box_size-(box_size/10))))
 SNEK_TOUNG = pygame.transform.scale(pygame.image.load("data/snek_toung.png"), (math.floor(box_size-(box_size/10)), math.floor(box_size-(box_size/10))))
@@ -43,6 +45,7 @@ snake = []
 new_snake = []
 
 snake.append([8, 8])
+snake.append([8, 7])
 apple = get_rand_pos(snake)
 
 
@@ -154,13 +157,13 @@ def surrounding(snake):
     south = 0
     east = 0
     west = 0
-    if [snake[0][0], snake[0][1]-1] in snake:
+    if [snake[0][0], snake[0][1]-1] in snake or snake[0][1]-1 < 0:
         north = 1
-    if [snake[0][0], snake[0][1]+1] in snake:
+    if [snake[0][0], snake[0][1]+1] in snake or snake[0][1]+1 > 16:
         south = 1
-    if [snake[0][0]+1, snake[0][1]] in snake:
+    if [snake[0][0]+1, snake[0][1]] in snake or snake[0][0]+1 > 16:
         east = 1
-    if [snake[0][0]-1, snake[0][1]] in snake:
+    if [snake[0][0]-1, snake[0][1]] in snake or snake[0][0]-1 < 0:
         west = 1
     return north, south, east, west
 
@@ -172,12 +175,12 @@ def get_data(snake, apple, current_dir):
     north, south, east, west = surrounding(snake)
 
     data = np.array([d_food_x, d_food_y,
-                    n_wall, s_wall, e_wall, w_wall,
-                    tail_x, tail_y,
+                    #n_wall, s_wall, e_wall, w_wall,
+                    #tail_x, tail_y,
                     north, south, east, west,
                     current_dir])
 
-    return data
+    return data.flatten()
 
 
 clock = pygame.time.Clock()
